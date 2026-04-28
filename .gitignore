@@ -1,4 +1,4 @@
-# OS files
+﻿# OS files
 Thumbs.db
 db.
 Desktop.ini
@@ -19,3 +19,6 @@ Desktop.ini
 
 # Documentation & Internal Tasks (Local only)
 .docs/
+tasks/
+archives/
+venv/
