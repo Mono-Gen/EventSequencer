@@ -8,21 +8,35 @@ archives/
 # Git Metadata
 .gitignore
 
-# Python Standard
-__pycache__/
-venv/
-*.py[cod]
+# Environment & Secrets
 .env
 .env.*
+venv/
+node_modules/
 
-# Build Artifacts
-build/
-dist/
+# Build & Output (Standard)
 bin/
 obj/
+build/
+dist/
+out/
+
+# Binary Artifacts
 *.exe
 *.dll
 *.pdb
-*.spec
+*.msi
 *.zip
+*.tar.gz
+
+# IDEs & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Project Specific
+__pycache__/
+*.py[cod]
+*.spec
 app_icon.ico
