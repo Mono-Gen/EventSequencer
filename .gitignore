@@ -20,6 +20,18 @@ Desktop.ini
 # Documentation & Internal Tasks (Local only)
 .docs/
 tasks/
+.tasks/
 archives/
 venv/
 .agents/
+
+# Security
+.env
+.env.*
+
+# Build Artifacts
+bin/
+obj/
+*.exe
+*.dll
+*.pdb

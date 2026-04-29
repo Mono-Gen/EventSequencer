@@ -1,7 +1,8 @@
-﻿# AI Rules & Management (Confidential)
+# AI Rules & Management (Confidential)
 .agents/
 .docs/
 tasks/
+.tasks/
 archives/
 
 # Git Metadata
@@ -12,10 +13,16 @@ __pycache__/
 venv/
 *.py[cod]
 .env
+.env.*
 
 # Build Artifacts
 build/
 dist/
+bin/
+obj/
+*.exe
+*.dll
+*.pdb
 *.spec
 *.zip
 app_icon.ico
