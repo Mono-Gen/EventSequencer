@@ -1,4 +1,4 @@
-# EventSequencer Operation Manual (v0.9.0)
+# EventSequencer Operation Manual (v0.9.1)
 
 EventSequencer is a professional-grade standalone DAW sequencer built with Next.js and Electron.
 
@@ -31,17 +31,38 @@ EventSequencer is a professional-grade standalone DAW sequencer built with Next.
 - **Duplicate**: `Alt + Drag` an event to copy it.
 - **Delete**: Select an event and press the `Delete` key or use the property panel.
 
-## 3. Remote Control (TCP)
+## 3. Network Control (TCP / OSC)
 
+### TCP Remote Control
 Control the application via network from external hardware or software (e.g., Stream Deck).
-
-- **Port**: `9001`
-- **Protocol**: TCP (Telnet compatible)
+- **Port**: `9001` (TCP)
 - **Commands**:
   - `@play`: Start playback
   - `@pause`: Pause playback
   - `@stop`: Stop and reset
   - `@status`: Query current state (returns `@play@`, `@pause@`, or `@stop@`)
+
+### OSC Support (Incoming)
+Control the transport via OSC messages from external controllers.
+- **Port**: `8000` (UDP)
+- **Transport Addresses**:
+  - `/transport/play`: Play
+  - `/transport/stop`: Stop
+  - `/transport/pause`: Pause
+
+---
+
+## 4. Event Details & OSC Typing
+
+### RAMP Events
+Automation events that interpolate values over a specified duration.
+- **High-Precision Engine**: Features a dedicated engine that ensures strict delivery of start/end values, ideal for precise OSC fader control.
+- **OSC Type Prefixes**: You can explicitly specify OSC data types in the Command Template using the following prefixes:
+  - `i:` : Integer (32-bit)
+  - `f:` : Float (32-bit)
+  - `d:` : Double (64-bit) - **Recommended for high-precision fader control**
+  - `s:` : String
+- **Example**: Setting `VOL d:{value}` sends the value as a 64-bit Double. If prefixes are omitted, types are automatically inferred.
 
 ## 4. Security and Environment
 

@@ -1,4 +1,4 @@
-export type Protocol = 'tcp' | 'udp';
+export type Protocol = 'tcp' | 'udp' | 'osc';
 export type CommandType = 'trigger' | 'on' | 'off' | 'ramp';
 export type DataFormat = 'ascii' | 'hex';
 export type Terminator = 'none' | 'cr' | 'lf' | 'crlf';

@@ -302,7 +302,6 @@ export const Timeline: React.FC<TimelineProps> = ({
             <span className="text-[13px] font-black tracking-widest text-zinc-200 uppercase truncate">TRACK LIST</span>
             {isLocked && <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-500/10 border border-orange-500/20"><Lock size={10} className="text-orange-500" /><span className="text-[8px] font-black text-orange-500">LOCKED</span></div>}
           </div>
-          {!isLocked && <button onClick={onAddDevice} className="p-1.5 hover:bg-zinc-800 rounded-lg text-blue-500 transition-colors shrink-0"><Plus size={16} /></button>}
           <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/50 transition-colors z-[100]" onMouseDown={() => setIsResizingSidebar(true)} onDoubleClick={handleResetAutoWidth} />
         </div>
         
@@ -406,9 +405,9 @@ export const Timeline: React.FC<TimelineProps> = ({
                       <input autoFocus className="w-full bg-zinc-950 border border-blue-500 rounded px-2 py-0.5 text-[13px] font-black text-white outline-none" value={editNameValue} onChange={(e) => setEditNameValue(e.target.value)} onBlur={() => handleFinishEditingName(device.id, 'device')} onKeyDown={(e) => e.key === 'Enter' && handleFinishEditingName(device.id, 'device')} onClick={(e) => e.stopPropagation()} />
                     ) : (
                       <>
-                        <span className="text-[13px] font-black text-white truncate uppercase tracking-wide group-hover/dev:text-blue-400 transition-colors shrink-0" onDoubleClick={(e) => { e.stopPropagation(); if(!isLocked) handleStartEditing(device.id, device.name); }}>{device.name}</span>
+                        <span className="text-[13px] font-black text-white truncate uppercase tracking-wide group-hover/dev:text-blue-400 transition-colors flex-1" onDoubleClick={(e) => { e.stopPropagation(); if(!isLocked) handleStartEditing(device.id, device.name); }}>{device.name}</span>
                         {!isLocked && (
-                          <div className="flex items-center gap-0.5 opacity-0 group-hover/dev:opacity-100 transition-opacity bg-zinc-900/80 backdrop-blur-sm rounded-lg py-1 px-1">
+                          <div className="flex items-center gap-0.5 opacity-0 group-hover/dev:opacity-100 transition-opacity bg-zinc-900/80 backdrop-blur-sm rounded-lg py-1 px-1 mr-2">
                             <button onClick={(e) => { e.stopPropagation(); handleStartEditing(device.id, device.name); }} className="p-1 hover:bg-zinc-700 rounded text-zinc-400 transition-colors"><Edit3 size={15} /></button>
                             <button onClick={(e) => { e.stopPropagation(); onDeleteDevice(device.id); }} className="p-1 hover:bg-red-500/20 rounded text-red-500 transition-colors"><Trash2 size={15} /></button>
                             <button onClick={(e) => { e.stopPropagation(); onAddTrack(device.id); }} className="p-1 hover:bg-zinc-700 rounded text-zinc-400 transition-colors"><Plus size={15} /></button>
@@ -440,9 +439,9 @@ export const Timeline: React.FC<TimelineProps> = ({
                           <input autoFocus className="w-full bg-zinc-950 border border-blue-500 rounded px-2 py-0.5 text-[11px] font-bold text-zinc-300 outline-none" value={editNameValue} onChange={(e) => setEditNameValue(e.target.value)} onBlur={() => handleFinishEditingName(track.id, 'track')} onKeyDown={(e) => e.key === 'Enter' && handleFinishEditingName(track.id, 'track')} onClick={(e) => e.stopPropagation()} />
                         ) : (
                           <>
-                            <span className="text-[11px] text-zinc-400 font-bold truncate uppercase group-hover/track:text-zinc-200 transition-colors shrink-0" onDoubleClick={(e) => { e.stopPropagation(); if(!isLocked) handleStartEditing(track.id, track.name); }}>{track.name}</span>
+                            <span className="text-[11px] text-zinc-400 font-bold truncate uppercase group-hover/track:text-zinc-200 transition-colors flex-1" onDoubleClick={(e) => { e.stopPropagation(); if(!isLocked) handleStartEditing(track.id, track.name); }}>{track.name}</span>
                             {!isLocked && (
-                              <div className="flex items-center gap-0.5 opacity-0 group-hover/track:opacity-100 transition-all bg-zinc-900/80 backdrop-blur-sm rounded-lg py-1 px-1">
+                              <div className="flex items-center gap-0.5 opacity-0 group-hover/track:opacity-100 transition-all bg-zinc-900/80 backdrop-blur-sm rounded-lg py-1 px-1 mr-2">
                                 <button onClick={(e) => { e.stopPropagation(); handleStartEditing(track.id, track.name); }} className="p-1 hover:bg-zinc-700 rounded text-zinc-500 hover:text-zinc-200 transition-all"><Edit3 size={14} /></button>
                                 <button onClick={(e) => { e.stopPropagation(); onDeleteTrack(track.id); }} className="p-1 hover:bg-red-500/20 rounded text-red-500 transition-all"><Trash2 size={14} /></button>
                               </div>

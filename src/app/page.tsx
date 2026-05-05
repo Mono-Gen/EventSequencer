@@ -34,15 +34,15 @@ interface ActiveRamp {
   eventId: string;
   realStartTime: number; 
   duration: number;
-  startValue: number;
-  endValue: number;
+  startValue: string | number;
+  endValue: string | number;
   rampMode: 'smooth' | 'stepped';
   steps: number; 
   template: string;
   deviceId: string;
   format: 'ascii' | 'hex';
   terminator: any;
-  lastValue?: number;
+  lastValue?: string | number;
 }
 
 export default function Home() {
@@ -329,9 +329,17 @@ export default function Home() {
             if (device) {
               if (ev.type === 'ramp') {
                 const re = ev as RampEvent;
+                const startVal = parseFloat(re.startValue.toString()) || 0;
+                const isOsc = device.protocol === 'osc';
+                const isFloat = (re.commandTemplate || '').includes('f:');
+                const startValueStr = re.startValue.toString();
+                const initialCommand = (re.commandTemplate || 'VOL {value}').replace('{value}', startValueStr).replace('{valeu}', startValueStr);
+                sendCommand(device, { id: ev.id, type: 'trigger', format: ev.format, terminator: ev.terminator }, initialCommand);
+
                 setActiveRamps(prev => [...prev, {
                   id: generateId('active_ramp_'), eventId: ev.id, realStartTime: wallNow, duration: re.duration, startValue: re.startValue, endValue: re.endValue,
-                  rampMode: re.rampMode || 'smooth', steps: re.steps || 10, template: re.commandTemplate, deviceId: device.id, format: ev.format, terminator: ev.terminator, lastValue: undefined
+                  rampMode: re.rampMode || 'smooth', steps: re.steps || 10, template: re.commandTemplate, deviceId: device.id, format: ev.format, terminator: ev.terminator, 
+                  lastValue: startValueStr
                 }]);
               } else { sendCommand(device, ev); }
             }
@@ -349,23 +357,43 @@ export default function Home() {
             const endVal = Number(ramp.endValue) || 0;
             const elapsed = wallNow - ramp.realStartTime;
             const progress = Math.min(1, elapsed / duration);
-            let roundedVal: number;
+            const device = devicesRef.current.find(d => d.id === ramp.deviceId);
+            const isOsc = device?.protocol === 'osc';
+            const isFloat = (ramp.template || '').includes('f:');
+
+            let val: number;
             if (ramp.rampMode === 'stepped') {
               const steps = Math.max(1, ramp.steps);
               const stepProgress = Math.floor(progress * steps) / steps;
-              roundedVal = Math.round(startVal + (endVal - startVal) * stepProgress);
-              if (progress >= 1) roundedVal = Math.round(endVal);
-            } else { roundedVal = Math.round(startVal + (endVal - startVal) * progress); }
-            
-            if (roundedVal !== ramp.lastValue) {
-              const command = (ramp.template || 'VOL {value}').replace('{value}', roundedVal.toString()).replace('{valeu}', roundedVal.toString());
-              const device = devicesRef.current.find(d => d.id === ramp.deviceId);
-              if (device) sendCommand(device, { id: ramp.eventId, type: 'trigger', format: ramp.format, terminator: ramp.terminator }, command);
-              ramp.lastValue = roundedVal;
+              val = startVal + (endVal - startVal) * stepProgress;
+              if (progress >= 1) val = endVal;
+            } else { 
+              val = startVal + (endVal - startVal) * progress;
             }
-            if (progress < 1) nextRamps.push(ramp);
-            else setTimeout(() => setEventStatus(os => { const n = {...os}; delete n[ramp.eventId]; return n; }), 1000);
+
+            const finalVal = (isOsc || isFloat) ? val : Math.round(val);
+            const lastValNum = ramp.lastValue !== undefined ? Number(ramp.lastValue) : -999999;
+            const hasChanged = Math.abs(finalVal - lastValNum) > 0.0001;
+
+            if (progress < 1) {
+              if (hasChanged) {
+                const command = (ramp.template || 'VOL {value}').replace('{value}', finalVal.toString()).replace('{valeu}', finalVal.toString());
+                if (device) sendCommand(device, { id: ramp.eventId, type: 'trigger', format: ramp.format, terminator: ramp.terminator }, command);
+                ramp.lastValue = finalVal;
+              }
+              nextRamps.push(ramp);
+            } else {
+              // Final value - use the original string to avoid float precision issues (like 0.899999...)
+              const endValueStr = ramp.endValue.toString();
+              if (ramp.lastValue?.toString() !== endValueStr) {
+                const command = (ramp.template || 'VOL {value}').replace('{value}', endValueStr).replace('{valeu}', endValueStr);
+                if (device) sendCommand(device, { id: ramp.eventId, type: 'trigger', format: ramp.format, terminator: ramp.terminator }, command);
+                ramp.lastValue = endValueStr;
+              }
+              setTimeout(() => setEventStatus(os => { const n = {...os}; delete n[ramp.eventId]; return n; }), 1000);
+            }
           });
+          activeRampsRef.current = nextRamps;
           return nextRamps;
         });
       }
@@ -661,23 +689,38 @@ export default function Home() {
 
       {showProjectManager && <ProjectManager currentProjectName={projectName} onLoad={handleLoadProject} onSave={handleSaveProject} onClose={() => setShowProjectManager(false)} />}
       {selectedEvent && (
-        <div className="w-80 flex-shrink-0">
+        <div className="w-80 flex-shrink-0 z-[100] relative">
           <Inspector 
             event={selectedEvent} 
             devices={devices} 
+            protocol={devices.find(d => d.id === tracks.find(t => t.id === selectedEvent.trackId)?.deviceId)?.protocol}
             onUpdate={(ev) => setEvents(events.map(e => e.id === ev.id ? ev : e))} 
             onDelete={(id) => { setEvents(events.filter(e => e.id !== id)); setSelectedEventId(null); }} 
             onClose={() => setSelectedEventId(null)}
             onFire={(ev) => {
               const track = tracksRef.current.find(t => t.id === ev.trackId);
               const device = devicesRef.current.find(d => d.id === track?.deviceId);
-              if (device && ev.type === 'ramp') {
-                const re = ev as RampEvent;
-                setActiveRamps(prev => [...prev, {
-                  id: generateId('preview_ramp_'), eventId: ev.id, realStartTime: Date.now(), duration: re.duration, startValue: re.startValue, endValue: re.endValue,
-                  rampMode: re.rampMode || 'smooth', steps: re.steps || 10, template: re.commandTemplate, deviceId: device.id, format: ev.format, terminator: ev.terminator, lastValue: undefined
-                }]);
-              } else if (device) { sendCommand(device, ev); }
+              if (device) {
+                if (ev.type === 'ramp') {
+                  const re = ev as RampEvent;
+                  const startVal = parseFloat(re.startValue.toString()) || 0;
+                  const isOsc = device.protocol === 'osc';
+                  const isFloat = (re.commandTemplate || '').includes('f:');
+                  const startValueStr = re.startValue.toString();
+                  const initialCommand = (re.commandTemplate || 'VOL {value}').replace('{value}', startValueStr).replace('{valeu}', startValueStr);
+                  sendCommand(device, { id: ev.id, type: 'trigger', format: ev.format, terminator: ev.terminator }, initialCommand);
+
+                  setActiveRamps(prev => {
+                    const next = [...prev, {
+                      id: generateId('preview_ramp_'), eventId: ev.id, realStartTime: Date.now(), duration: re.duration, startValue: re.startValue, endValue: re.endValue,
+                      rampMode: re.rampMode || 'smooth', steps: re.steps || 10, template: re.commandTemplate, deviceId: device.id, format: ev.format, terminator: ev.terminator, 
+                      lastValue: startValueStr
+                    }];
+                    activeRampsRef.current = next;
+                    return next;
+                  });
+                } else { sendCommand(device, ev); }
+              }
             }}
             lastTally={eventStatus[selectedEventId!]?.message} 
             isFiring={eventStatus[selectedEventId!]?.status === 'firing' || activeRamps.some(r => r.eventId === selectedEventId)}
@@ -686,7 +729,7 @@ export default function Home() {
         </div>
       )}
       {selectedDevice && (
-        <div className="w-80 flex-shrink-0">
+        <div className="w-80 flex-shrink-0 z-[100] relative">
           <DeviceInspector 
             device={selectedDevice} 
             tracks={tracks} 

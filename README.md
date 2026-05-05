@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./docs/assets/logo.png" width="400" alt="EventSequencer Logo" />
+  <img src="./docs/assets/logo.png" width="400" alt="EventSequencer v0.9.1 Logo" />
 </p>
 
 A professional-grade standalone DAW sequencer built with Next.js and Electron. Designed for mission-critical event triggering and remote hardware automation with high-precision timing.
@@ -8,7 +8,7 @@ A professional-grade standalone DAW sequencer built with Next.js and Electron. D
 
 ## 📖 Manuals
 - **[User Manual (English)](./docs/manual_EN.md)**
-- **[操作マニュアル (日本語)](./docs/manual_JA.md)**
+- **[操作マニュアル (日本語)](./docs/manual_JP.md)**
 
 ## ✨ Key Features
 
@@ -18,10 +18,14 @@ A professional-grade standalone DAW sequencer built with Next.js and Electron. D
   - Double-click to create/edit events.
   - **Auto-Width Sidebar**: Double-click the "TRACK LIST" header to auto-fit sidebar width to your content.
   - **Direct Time Entry**: Edit event execution times directly in the inspector using `HH:MM:SS.mmm` format.
+- **Multi-Protocol Support**:
+  - **TCP/UDP**: Send raw hex or ASCII commands with custom terminators (`CR`, `LF`, `CRLF`).
+  - **OSC (Open Sound Control)**: Full support for OSC address and arguments (`int`, `float`, `double`, `string`) with real-time syntax highlighting.
 - **Advanced Event Types**:
   - `Trigger`: Single discrete commands.
   - `On / Off`: State-aware command pairs.
-  - `Ramp`: Automated interpolation between values (Smooth or Stepped) with real-time packet estimation.
+  - `Ramp`: Automated interpolation between values (Smooth or Stepped) with real-time packet estimation. 
+  - **High-Precision Engine**: Optimized for OSC faders with strict start/end value delivery and 64-bit Double support (`d:` prefix).
 - **Remote TCP Control**: Integrated server on port `9001` for external automation via Stream Deck, PacketSender, or custom scripts.
 - **LOCK Mode**: Safety guard for live performance environments to prevent accidental modifications.
 

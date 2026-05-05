@@ -14,12 +14,13 @@ interface InspectorProps {
   lastTally?: string;
   isFiring?: boolean;
   isLocked?: boolean;
+  protocol?: string;
 }
 
 import { msToTimeStr, timeStrToMs } from '@/lib/timeUtils';
 
 export const Inspector: React.FC<InspectorProps> = ({ 
-  event, devices, onUpdate, onDelete, onClose, onFire, lastTally, isFiring, isLocked = false
+  event, devices, onUpdate, onDelete, onClose, onFire, lastTally, isFiring, isLocked = false, protocol
 }) => {
   const [localTime, setLocalTime] = React.useState(msToTimeStr(event.time));
 
@@ -104,6 +105,40 @@ export const Inspector: React.FC<InspectorProps> = ({
   };
 
   const estimation = getRampEstimation();
+  
+  const renderOSCHighlight = (text: string) => {
+    if (!text) return null;
+    const parts = text.trim().split(/\s+/);
+    const address = parts[0];
+    const args = parts.slice(1);
+
+    return (
+      <div className="flex flex-wrap gap-1 font-mono text-[11px] py-1">
+        <span className="text-blue-400">{address}</span>
+        {args.map((arg, i) => {
+          const prefixMatch = arg.match(/^([ifds]):(.+)$/);
+          if (prefixMatch) {
+            const [, prefix, value] = prefixMatch;
+            const colorClass = prefix === 'i' ? 'text-amber-400' : 
+                               prefix === 'f' ? 'text-emerald-400' : 
+                               prefix === 'd' ? 'text-cyan-400' : 
+                               'text-pink-400';
+            return (
+              <span key={i} className="flex items-center">
+                <span className="text-white font-bold text-[9px] mr-0.5 opacity-100">{prefix}:</span>
+                <span className={colorClass}>{value}</span>
+              </span>
+            );
+          }
+          return (
+            <span key={i} className={!isNaN(Number(arg)) ? "text-emerald-400" : "text-zinc-300"}>
+              {arg}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className={`w-80 h-full bg-[#0f0f0f] border-l ${isLocked ? 'border-orange-500/50' : 'border-zinc-800'} flex flex-col shadow-2xl animate-in slide-in-from-right duration-300 relative`}>
@@ -136,25 +171,27 @@ export const Inspector: React.FC<InspectorProps> = ({
           </div>
         </div>
 
-        <div className="space-y-4">
-          <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Protocol & Format</label>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <span className="text-[11px] text-zinc-400 flex items-center gap-2"><Hash size={12} /> Data Format</span>
-              <div className="flex p-0.5 bg-zinc-900 border border-zinc-800 rounded-lg">
-                {(['ascii', 'hex'] as DataFormat[]).map(f => (
-                  <button key={f} disabled={isLocked} onClick={() => handleFormatChange(f)} className={`flex-1 py-1 rounded-md text-[10px] font-bold uppercase transition-all ${event.format === f ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>{f}</button>
-                ))}
+        {protocol !== 'osc' && (
+          <div className="space-y-4">
+            <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Protocol & Format</label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <span className="text-[11px] text-zinc-400 flex items-center gap-2"><Hash size={12} /> Data Format</span>
+                <div className="flex p-0.5 bg-zinc-900 border border-zinc-800 rounded-lg">
+                  {(['ascii', 'hex'] as DataFormat[]).map(f => (
+                    <button key={f} disabled={isLocked} onClick={() => handleFormatChange(f)} className={`flex-1 py-1 rounded-md text-[10px] font-bold uppercase transition-all ${event.format === f ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>{f}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-[11px] text-zinc-400 flex items-center gap-2"><CornerDownLeft size={12} /> Terminator</span>
+                <select disabled={isLocked} value={event.terminator || 'none'} onChange={(e) => handleChange('terminator', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-[10px] focus:outline-none">
+                  <option value="none">NONE</option><option value="cr">CR (\r)</option><option value="lf">LF (\n)</option><option value="crlf">CR+LF</option>
+                </select>
               </div>
             </div>
-            <div className="space-y-1.5">
-              <span className="text-[11px] text-zinc-400 flex items-center gap-2"><CornerDownLeft size={12} /> Terminator</span>
-              <select disabled={isLocked} value={event.terminator || 'none'} onChange={(e) => handleChange('terminator', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-[10px] focus:outline-none">
-                <option value="none">NONE</option><option value="cr">CR (\r)</option><option value="lf">LF (\n)</option><option value="crlf">CR+LF</option>
-              </select>
-            </div>
           </div>
-        </div>
+        )}
 
         <div className="space-y-4">
           <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Command Configuration</label>
@@ -192,6 +229,12 @@ export const Inspector: React.FC<InspectorProps> = ({
               <div className="space-y-1.5">
                 <span className="text-[11px] text-zinc-400">Command Data {event.format === 'hex' ? '(HEX)' : '(ASCII)'}</span>
                 <textarea readOnly={isLocked} value={(event as any).command || ''} onChange={(e) => handleChange('command', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm font-mono min-h-[80px] focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all" placeholder={event.format === 'hex' ? "F0 01 7F ..." : "Enter command..."} />
+                {protocol === 'osc' && event.format !== 'hex' && (
+                  <div className="mt-1 px-2 py-1 rounded bg-black/40 border border-zinc-800/50">
+                    <div className="text-[8px] text-zinc-600 font-black uppercase mb-1">OSC Preview</div>
+                    {renderOSCHighlight((event as any).command || '')}
+                  </div>
+                )}
               </div>
               <button onClick={() => onFire(event)} disabled={isFiring || isLocked} className={`w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 transition-all border ${isFiring ? 'bg-blue-500/20 text-blue-400 border-blue-500/30 animate-pulse' : (event.type === 'on' ? 'bg-emerald-600 border-emerald-500 hover:bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : event.type === 'off' ? 'bg-zinc-700 border-zinc-600 hover:bg-zinc-600' : 'bg-blue-600 border-blue-500 hover:bg-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.3)]') + ' text-white hover:scale-[0.98] active:scale-95'} ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 {isFiring ? <Zap size={14} className="animate-spin" /> : event.type === 'on' ? <Power size={14} /> : event.type === 'off' ? <PowerOff size={14} /> : <Play size={14} fill="currentColor" />}
@@ -242,7 +285,16 @@ export const Inspector: React.FC<InspectorProps> = ({
                 </div>
               )}
 
-              <div className="space-y-1.5"><span className="text-[11px] text-zinc-400">Template</span><input readOnly={isLocked} value={(event as any).commandTemplate || ''} onChange={(e) => handleChange('commandTemplate', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm font-mono" placeholder="VOL {value}" /></div>
+              <div className="space-y-1.5">
+                <span className="text-[11px] text-zinc-400">Template</span>
+                <input readOnly={isLocked} value={(event as any).commandTemplate || ''} onChange={(e) => handleChange('commandTemplate', e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm font-mono" placeholder="VOL {value}" />
+                {protocol === 'osc' && (
+                  <div className="mt-1 px-2 py-1 rounded bg-black/40 border border-zinc-800/50">
+                    <div className="text-[8px] text-zinc-600 font-black uppercase mb-1">OSC Preview</div>
+                    {renderOSCHighlight(((event as any).commandTemplate || '').replace('{value}', '100'))}
+                  </div>
+                )}
+              </div>
               
               <button onClick={() => onFire(event)} disabled={isFiring || isLocked} className={`w-full py-3 rounded-xl bg-amber-600 text-white border border-amber-500 font-black text-[10px] uppercase tracking-widest hover:bg-amber-500 transition-all flex items-center justify-center gap-2 ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <Zap size={14} /> Preview Ramp

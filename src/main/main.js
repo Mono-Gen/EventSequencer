@@ -16,7 +16,7 @@ function createWindow() {
       contextIsolation: true,
     },
     backgroundColor: '#050505',
-    title: 'Event Sequencer v0.9.0',
+    title: 'Event Sequencer v0.9.1',
     autoHideMenuBar: true, // プロフェッショナルなDAWらしくメニューを隠す
   });
 

@@ -1,8 +1,11 @@
 import net from 'net';
 import dgram from 'dgram';
+import { Server, Client } from 'node-osc';
 import { exec } from 'child_process';
 import util from 'util';
 import { DeviceConfig, DataFormat, Terminator } from '../types';
+import { remoteStore } from '../remoteStore';
+import { startRemoteServer } from '../remoteServer';
 
 const execAsync = util.promisify(exec);
 
@@ -10,6 +13,8 @@ export class NetworkManager {
   private static instance: NetworkManager;
   private tcpClients: Map<string, net.Socket> = new Map();
   private udpSocket: dgram.Socket;
+  private oscClients: Map<string, Client> = new Map();
+  private oscServer: Server | null = null;
   
   // Track the last time we confirmed the device was reachable
   private lastOnlineMap: Map<string, number> = new Map();
@@ -21,8 +26,59 @@ export class NetworkManager {
   public static getInstance(): NetworkManager {
     if (!NetworkManager.instance) {
       NetworkManager.instance = new NetworkManager();
+      // Auto-start OSC server and Remote server on first access
+      NetworkManager.instance.startOscServer(8000);
+      startRemoteServer();
     }
     return NetworkManager.instance;
+  }
+
+  /**
+   * Start OSC Server for remote transport control
+   */
+  public startOscServer(port: number = 8000) {
+    if (this.oscServer) {
+      try { this.oscServer.close(); } catch (e) {}
+    }
+
+    try {
+      this.oscServer = new Server(port, '0.0.0.0', () => {
+        console.log(`[OSC] Server listening on port ${port}`);
+      });
+
+      this.oscServer.on('message', (msg) => {
+        const [address, ...args] = msg;
+        console.log(`[OSC] Received: ${address}`, args);
+        this.handleRemoteCommand(address, args);
+      });
+
+      this.oscServer.on('error', (err) => {
+        console.error(`[OSC Server Error]`, err);
+      });
+    } catch (err) {
+      console.error(`[OSC Server Setup Error]`, err);
+    }
+  }
+
+  private async handleRemoteCommand(address: string, args: any[]) {
+    // This will be handled via an internal event system or a callback 
+    // to trigger Start/Stop/Pause in the UI.
+    // Since this runs in the server process, we send it to the UI via SSE/Websocket if available.
+    // In this app, we have /api/remote/status to sync status.
+    // We can use the same mechanism to "push" commands to the UI.
+    
+    let command = '';
+    if (address === '/transport/play') command = 'PLAY';
+    else if (address === '/transport/stop') command = 'STOP';
+    else if (address === '/transport/pause') command = 'PAUSE';
+    
+    if (command) {
+      try {
+        remoteStore.pushCommand(command as 'PLAY' | 'PAUSE' | 'STOP');
+      } catch (e) {
+        console.error(`[OSC] RemoteStore error:`, e);
+      }
+    }
   }
 
   /**
@@ -138,10 +194,58 @@ export class NetworkManager {
 
     if (device.protocol === 'tcp') {
       return await this.sendTcp(device, payload);
+    } else if (device.protocol === 'osc') {
+      return await this.sendOsc(device, data);
     } else {
       await this.sendUdp(device, payload);
       return 'UDP Sent (No Tally)';
     }
+  }
+
+  private async sendOsc(device: DeviceConfig, data: string): Promise<string> {
+    const key = `${device.ip}:${device.port}`;
+    let client = this.oscClients.get(key);
+
+    if (!client) {
+      client = new Client(device.ip, device.port);
+      this.oscClients.set(key, client);
+    }
+
+    const { address, args } = this.parseOscMessage(data);
+
+    return new Promise((resolve, reject) => {
+      client!.send(address, ...args, (err: any) => {
+        if (err) {
+          // Cleanup on error to prevent stale clients
+          client?.close();
+          this.oscClients.delete(key);
+          reject(err);
+        } else {
+          resolve(`OSC Sent: ${address} [${args.join(', ')}]`);
+        }
+      });
+    });
+  }
+
+  private parseOscMessage(data: string): { address: string, args: any[] } {
+    const parts = data.trim().split(/\s+/);
+    const address = parts[0];
+    const args: any[] = [];
+
+    parts.slice(1).forEach(part => {
+      if (part.startsWith('i:')) args.push(parseInt(part.substring(2)));
+      else if (part.startsWith('f:')) args.push(parseFloat(part.substring(2)));
+      else if (part.startsWith('d:')) args.push(Number(part.substring(2)));
+      else if (part.startsWith('s:')) args.push(part.substring(2));
+      else if (!isNaN(Number(part)) && part.trim() !== '') {
+        if (part.includes('.')) args.push(parseFloat(part));
+        else args.push(parseInt(part));
+      } else {
+        args.push(part);
+      }
+    });
+
+    return { address, args };
   }
 
   private async sendTcp(device: DeviceConfig, payload: Buffer): Promise<string> {
@@ -172,7 +276,7 @@ export class NetworkManager {
         this.writeAndRead(client!, payload).then(resolve).catch(reject);
       });
 
-      client?.on('error', (err) => {
+      client?.on('error', (err: any) => {
         clearTimeout(timeout);
         reject(err);
       });
@@ -191,7 +295,7 @@ export class NetworkManager {
         resolve(data.toString('ascii').trim());
       });
 
-      client.write(payload, (err) => {
+      client.write(payload, (err: any) => {
         if (err) {
           clearTimeout(timeout);
           reject(err);
@@ -202,7 +306,7 @@ export class NetworkManager {
 
   private async sendUdp(device: DeviceConfig, payload: Buffer): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.udpSocket.send(payload, device.port, device.ip, (err) => {
+      this.udpSocket.send(payload, device.port, device.ip, (err: any) => {
         if (err) reject(err);
         else resolve();
       });

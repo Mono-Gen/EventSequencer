@@ -91,7 +91,7 @@ export const DeviceInspector: React.FC<DeviceInspectorProps> = ({ device, tracks
             <div className="space-y-1.5">
               <span className="text-[11px] text-zinc-400 flex items-center gap-2"><Server size={12} /> Protocol</span>
               <div className="flex p-0.5 bg-zinc-900 border border-zinc-800 rounded-lg h-[38px]">
-                {(['tcp', 'udp'] as Protocol[]).map(p => (
+                {(['tcp', 'udp', 'osc'] as Protocol[]).map(p => (
                   <button
                     key={p}
                     disabled={isLocked}
