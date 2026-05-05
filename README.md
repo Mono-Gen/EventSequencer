@@ -1,41 +1,59 @@
-# AI Rules Template
+<p align="center">
+  <img src="./docs/assets/logo.png" width="400" alt="EventSequencer Logo" />
+</p>
 
-このリポジトリは、AIアシスタントを使用した開発プロジェクトで共通して使用する「開発ルール」をまとめたテンプレートです。
+A professional-grade standalone DAW sequencer built with Next.js and Electron. Designed for mission-critical event triggering and remote hardware automation with high-precision timing.
 
-## 特徴
-- **自動認識**: ルールは `.agents/rules/` に配置されており、対応するAI（Antigravity等）はこのリポジトリをクローンするだけで自動的にルールを認識・適用します。
-- **標準構成**: 多くのAI開発プロジェクトで推奨されるディレクトリ構成を採用しています。
+![UI Screenshot](./docs/assets/ui_screenshot.png)
 
-## 構成
-- `.agents/rules/global_rules.md`: 基本的な回答方針、ドキュメント管理、セキュリティ、プライバシーに関するルール。
-- `.agents/rules/code_style_guide.md`: コードの品質、スタイル、GitHub利用、開発プロセスに関する詳細なルール。
-- `.agents/rules/device_control_rules.md`: ハードウェア制御、通信アーキテクチャ、状態同期に関する特化ルール。
-- `.agents/rules/ui_ux_rules.md`: 機器制御UI、状態の視覚的表現、Stream Deck・専用コントローラー向けデザインルール。
-- `.agents/rules/resource_management_rules.md`: メモリ・スレッド・ソケット等のシステムリソース管理、マルチキャストJoin/Leave、ネットワークリソース管理のルール。
-- `.agents/rules/documentation_rules.md`: AIが後からコードを読んでも意図を正確に理解できるための、Docstring・型ヒント・コメント・定数定義に関するルール。
+## 📖 Manuals
+- **[User Manual (English)](./docs/manual_EN.md)**
+- **[操作マニュアル (日本語)](./docs/manual_JA.md)**
 
-## 使い方
-1. このリポジトリをプロジェクトのルートにクローンします。
-2. AIは自動的に `.agents/rules/` 内のルールを読み込み、開発をサポートします。
-3. **プロジェクト別設定**: プロジェクトのルートに `.agents/config.md` を作成し、適用したいルールファイルを記述することで、AIの読み込み負荷を下げ、精度を高めることができます。
-   ```markdown
-   # Project Rules Configuration
-   This project applies the following rules:
-   - .agents/rules/global_rules.md
-   - .agents/rules/code_style_guide.md
-   - .agents/rules/device_control_rules.md
-   ```
-4. プロジェクト固有のルールが必要な場合は、`.agents/rules/` 内にファイルを追加してください。
+## ✨ Key Features
 
-## ルールの保守と更新
-- **定期的見直し**: ルールは「一度作ったら終わり」ではなく、実際の開発で得られた知見（「この書き方の方がバグが少なかった」「このプロトコルには例外があった」等）を反映し、常に最新の状態に更新してください。
-- **AIへのフィードバック**: AIがルールに違反した場合は、その場で指摘すると同時に、必要であればルール自体の記述を改善してください。
+- **High-Precision Transport**: Reliable timing engine with sub-10ms resolution for accurate event triggering.
+- **Smart Timeline Interface**:
+  - Drag-and-drop reordering of tracks and devices.
+  - Double-click to create/edit events.
+  - **Auto-Width Sidebar**: Double-click the "TRACK LIST" header to auto-fit sidebar width to your content.
+  - **Direct Time Entry**: Edit event execution times directly in the inspector using `HH:MM:SS.mmm` format.
+- **Advanced Event Types**:
+  - `Trigger`: Single discrete commands.
+  - `On / Off`: State-aware command pairs.
+  - `Ramp`: Automated interpolation between values (Smooth or Stepped) with real-time packet estimation.
+- **Remote TCP Control**: Integrated server on port `9001` for external automation via Stream Deck, PacketSender, or custom scripts.
+- **LOCK Mode**: Safety guard for live performance environments to prevent accidental modifications.
 
-## セキュリティ
-- **絶対パスの禁止** や **機密情報のハードコード禁止** など、セキュリティに関する項目は常に最新の状態に保ち、厳守してください。
+## 🛠 Technical Stack
+- **Frontend**: Next.js 15 (React 19), TailwindCSS 4, Framer Motion.
+- **Runtime**: Electron 31 (Standalone Node.js environment).
+- **Communication**: Integrated TCP Server for remote control.
 
-## AIアシスタントへの合言葉（指示テンプレート）
+## 🚀 Getting Started
 
-新しいプロジェクトでこのルールを適用する際は、AIアシスタントに以下のメッセージをコピー＆ペーストして伝えてください。
+### Build Standalone Executable (.exe)
+To generate the production-ready portable Windows application:
+```bash
+npm run dist:exe
+```
+The output will be located in `dist/EventSequencer-win32-x64/`.
 
-> `https://github.com/Mono-Gen/ai-rules` をカレントディレクトリに展開・適用して。完了したら、[今回の開発目的] のための準備を始めて。
+## 📡 Remote Control Protocol
+
+Connect via TCP to port `9001`.
+
+- **Supported Commands**:
+  - `@play`: Start playback.
+  - `@pause`: Pause playback.
+  - `@stop`: Stop and reset to zero.
+  - `@status`: Query current state (returns `@play@`, `@pause@`, or `@stop@`).
+
+## 🛡 Privacy & Security
+
+- **Zero Environment Leakage**: Codebase is strictly cleaned of absolute paths and environment-specific metadata.
+- **Isolated Execution**: No external Node.js installation is required for the standalone build.
+- **Secure Communication**: Internal Next.js server runs on an isolated port (`3001`) in production to avoid system conflicts.
+
+---
+Copyright © 2026. All rights reserved.

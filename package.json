@@ -1,0 +1,53 @@
+{
+  "name": "event-sequencer",
+  "version": "0.9.0",
+  "private": true,
+  "main": "src/main/main.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build && cmd /c \"xcopy /E /I /Y .next\\static .next\\standalone\\.next\\static && xcopy /E /I /Y public .next\\standalone\\public\"",
+    "start": "next start",
+    "lint": "eslint",
+    "electron:dev": "electron .",
+    "dist:exe": "npm run build && cmd /c \"rmdir /S /Q dist_staging & mkdir dist_staging\" && cmd /c \"xcopy /E /I /Y .next\\standalone dist_staging\" && cmd /c \"mkdir dist_staging\\.next\\static & xcopy /E /I /Y .next\\static dist_staging\\.next\\static\" && cmd /c \"mkdir dist_staging\\public & xcopy /E /I /Y public dist_staging\\public\" && cmd /c \"mkdir dist_staging\\src\\main & xcopy /Y src\\main\\main.js dist_staging\\src\\main\\\" && cmd /c \"copy package.json dist_staging\\\" && npx electron-packager dist_staging EventSequencer --platform=win32 --arch=x64 --out=dist --overwrite --icon=public/favicon.ico --prune=false"
+  },
+  "dependencies": {
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.14.0",
+    "next": "16.2.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "electron": "^31.3.1",
+    "electron-builder": "^24.13.3",
+    "electron-is-dev": "^3.0.1",
+    "electron-packager": "^17.1.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "build": {
+    "appId": "com.eventsequencer.app",
+    "productName": "EventSequencer",
+    "copyright": "Copyright © 2026",
+    "directories": {
+      "output": "dist"
+    },
+    "asar": false,
+    "files": [
+      "src/main/**/*",
+      ".next/standalone/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "dir",
+      "icon": "public/favicon.ico"
+    }
+  }
+}

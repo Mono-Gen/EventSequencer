@@ -1,37 +1,46 @@
-# OS files
-Thumbs.db
-db.
-Desktop.ini
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+/dist/
+/dist_exe/
+/dist_staging/
+/dist_perfect_clean/
+
+# misc
 .DS_Store
-.AppleDouble
-.LSOverride
+*.pem
 
-# IDEs and Editors
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# Temporary files
-*.tmp
-*.log
+# env files (can opt-in for committing if needed)
+.env*
 
-# Documentation & Internal Tasks (Local only)
-.docs/
-tasks/
-.tasks/
-archives/
-venv/
-.agents/
+# vercel
+.vercel
 
-# Security
-.env
-.env.*
+# typescript
+*.tsbuildinfo
+next-env.d.ts
 
-# Build Artifacts
-bin/
-obj/
-*.exe
-*.dll
-*.pdb
+# project data
+/data/*.json
+!/data/default.json
+/sequences/*.json

@@ -1,0 +1,39 @@
+{
+  "devices": [],
+  "tracks": [],
+  "events": [
+    {
+      "id": "ev_bexivljid",
+      "time": 1304996.6488470524,
+      "trackId": "track_s9zomwcpx",
+      "type": "trigger",
+      "format": "ascii",
+      "terminator": "cr",
+      "command": "NEW_COMMAND"
+    },
+    {
+      "id": "ev_d8h6fy211",
+      "time": 545418.2119934291,
+      "trackId": "track_it4ip7shj",
+      "type": "ramp",
+      "format": "ascii",
+      "terminator": "cr",
+      "command": "NEW_COMMAND",
+      "endValue": 100,
+      "duration": 1000,
+      "commandTemplate": "VOL {value}",
+      "rampMode": "stepped"
+    },
+    {
+      "id": "ev_kmsvkutj3",
+      "time": 960720,
+      "trackId": "track_it4ip7shj",
+      "type": "trigger",
+      "format": "ascii",
+      "terminator": "cr",
+      "command": "NEW_COMMAND"
+    }
+  ],
+  "loopRange": null,
+  "isLooping": false
+}
