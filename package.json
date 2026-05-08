@@ -1,6 +1,6 @@
 {
   "name": "event-sequencer",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "private": true,
   "main": "src/main/main.js",
   "scripts": {
@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "electron:dev": "electron .",
-    "dist:exe": "npm run build && cmd /c \"rmdir /S /Q dist_staging & mkdir dist_staging\" && cmd /c \"xcopy /E /I /Y .next\\standalone dist_staging\" && cmd /c \"mkdir dist_staging\\.next\\static & xcopy /E /I /Y .next\\static dist_staging\\.next\\static\" && cmd /c \"mkdir dist_staging\\public & xcopy /E /I /Y public dist_staging\\public\" && cmd /c \"mkdir dist_staging\\src\\main & xcopy /Y src\\main\\main.js dist_staging\\src\\main\\\" && cmd /c \"copy package.json dist_staging\\\" && node scripts/cleanup_dist.js && npx electron-packager dist_staging EventSequencer v0.9.1 --platform=win32 --arch=x64 --out=dist --overwrite --icon=public/favicon.ico --prune=false"
+    "dist:exe": "npm run build && cmd /c \"rmdir /S /Q dist_staging & mkdir dist_staging\" && cmd /c \"xcopy /E /I /Y .next\\standalone dist_staging\" && cmd /c \"mkdir dist_staging\\.next\\static & xcopy /E /I /Y .next\\static dist_staging\\.next\\static\" && cmd /c \"mkdir dist_staging\\public & xcopy /E /I /Y public dist_staging\\public\" && cmd /c \"mkdir dist_staging\\src\\main & xcopy /Y src\\main\\main.js dist_staging\\src\\main\\\" && cmd /c \"copy package.json dist_staging\\\" && node scripts/cleanup_dist.js && npx electron-packager dist_staging EventSequencer v0.9.2 --platform=win32 --arch=x64 --out=dist --overwrite --icon=public/favicon.ico --prune=false"
   },
   "dependencies": {
     "framer-motion": "^12.38.0",
@@ -35,7 +35,7 @@
   },
   "build": {
     "appId": "com.eventsequencer.app",
-    "productName": "EventSequencer v0.9.1",
+    "productName": "EventSequencer v0.9.2",
     "copyright": "Copyright © 2026",
     "directories": {
       "output": "dist"

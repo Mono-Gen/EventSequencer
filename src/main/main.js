@@ -16,7 +16,7 @@ function createWindow() {
       contextIsolation: true,
     },
     backgroundColor: '#050505',
-    title: 'Event Sequencer v0.9.1',
+    title: 'Event Sequencer v0.9.2',
     autoHideMenuBar: true, // プロフェッショナルなDAWらしくメニューを隠す
   });
 
@@ -50,8 +50,13 @@ function startNextServer() {
     const serverPath = fs.existsSync(rootServerPath) ? rootServerPath : standaloneServerPath;
     const serverCwd = path.dirname(serverPath);
 
-    serverProcess = spawn('node', [serverPath], {
-      env: { ...process.env, PORT: '3001', NODE_ENV: 'production' },
+    serverProcess = spawn(process.execPath, [serverPath], {
+      env: { 
+        ...process.env, 
+        PORT: '3001', 
+        NODE_ENV: 'production',
+        ELECTRON_RUN_AS_NODE: '1'
+      },
       cwd: serverCwd
     });
 
