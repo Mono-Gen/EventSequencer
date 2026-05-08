@@ -1,4 +1,4 @@
-# EventSequencer Operation Manual (v0.9.1)
+# EventSequencer Operation Manual (v0.9.2)
 
 EventSequencer is a professional-grade standalone DAW sequencer built with Next.js and Electron.
 
@@ -68,6 +68,21 @@ Automation events that interpolate values over a specified duration.
 
 - **LOCK Mode**: Click the lock icon in the top right to enable "LOCK mode." This prevents accidental modifications during live performances.
 - **Standalone Execution**: Run `dist/EventSequencer-win32-x64/EventSequencer.exe`. No Node.js installation is required.
+
+## 5. Project Management
+
+### Project Manager
+You can open the "Project Manager" by clicking the folder icon in the top left corner.
+- **SAVE / SAVE NEW**: Name and save your current project.
+- **LOAD**: Load a previously saved project.
+- **OVERWRITE**: Update an existing project with the current state.
+
+### Data Storage Location
+Saved project data (`.json`) is stored in the following folder. Please refer to this for backups or moving to another environment.
+
+- **Location**: `data` folder in the project root
+  - Development: `[Project Root]\data\`
+  - Standalone (.exe): `[Extract Folder]\resources\app\data\`
 
 ---
 Copyright © 2026. All rights reserved.
