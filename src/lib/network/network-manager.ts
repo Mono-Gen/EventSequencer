@@ -9,6 +9,8 @@ import { startRemoteServer } from '../remoteServer';
 
 const execAsync = util.promisify(exec);
 
+type OscArg = string | number | boolean | Buffer;
+
 export class NetworkManager {
   private static instance: NetworkManager;
   private tcpClients: Map<string, net.Socket> = new Map();
@@ -46,8 +48,8 @@ export class NetworkManager {
         console.log(`[OSC] Server listening on port ${port}`);
       });
 
-      this.oscServer.on('message', (msg) => {
-        const [address, ...args] = msg;
+      this.oscServer.on('message', (msg: OscArg[]) => {
+        const [address, ...args] = msg as [string, ...OscArg[]];
         console.log(`[OSC] Received: ${address}`, args);
         this.handleRemoteCommand(address, args);
       });
@@ -60,7 +62,7 @@ export class NetworkManager {
     }
   }
 
-  private async handleRemoteCommand(address: string, args: any[]) {
+  private async handleRemoteCommand(address: string, args: OscArg[]) {
     // This will be handled via an internal event system or a callback 
     // to trigger Start/Stop/Pause in the UI.
     // Since this runs in the server process, we send it to the UI via SSE/Websocket if available.
@@ -214,12 +216,12 @@ export class NetworkManager {
     const { address, args } = this.parseOscMessage(data);
 
     return new Promise((resolve, reject) => {
-      client!.send(address, ...args, (err: any) => {
+      client!.send(address, ...args, (err: unknown) => {
         if (err) {
           // Cleanup on error to prevent stale clients
           client?.close();
           this.oscClients.delete(key);
-          reject(err);
+          reject(err instanceof Error ? err : new Error(String(err)));
         } else {
           resolve(`OSC Sent: ${address} [${args.join(', ')}]`);
         }
@@ -227,10 +229,10 @@ export class NetworkManager {
     });
   }
 
-  private parseOscMessage(data: string): { address: string, args: any[] } {
+  private parseOscMessage(data: string): { address: string, args: OscArg[] } {
     const parts = data.trim().split(/\s+/);
     const address = parts[0];
-    const args: any[] = [];
+    const args: OscArg[] = [];
 
     parts.slice(1).forEach(part => {
       if (part.startsWith('i:')) args.push(parseInt(part.substring(2)));
@@ -276,7 +278,7 @@ export class NetworkManager {
         this.writeAndRead(client!, payload).then(resolve).catch(reject);
       });
 
-      client?.on('error', (err: any) => {
+      client?.on('error', (err: Error) => {
         clearTimeout(timeout);
         reject(err);
       });
@@ -295,7 +297,7 @@ export class NetworkManager {
         resolve(data.toString('ascii').trim());
       });
 
-      client.write(payload, (err: any) => {
+      client.write(payload, (err: Error | null | undefined) => {
         if (err) {
           clearTimeout(timeout);
           reject(err);
@@ -306,7 +308,7 @@ export class NetworkManager {
 
   private async sendUdp(device: DeviceConfig, payload: Buffer): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.udpSocket.send(payload, device.port, device.ip, (err: any) => {
+      this.udpSocket.send(payload, device.port, device.ip, (err: Error | null) => {
         if (err) reject(err);
         else resolve();
       });

@@ -11,7 +11,8 @@ interface UsePlaybackEngineProps {
   events: Event[];
   loopRange: { start: number, end: number } | null;
   isLooping: boolean;
-  onSendCommand: (device: DeviceConfig, ev: any, customData?: string) => Promise<void>;
+  isLocked: boolean;
+  onSendCommand: (device: DeviceConfig, ev: Event | { id: string, type: 'trigger', format: string, terminator: any }, customData?: string) => Promise<void>;
   onEventStatusUpdate: (eventId: string, status: 'firing' | 'success' | 'error', message?: string) => void;
   onClearEventStatus: (eventId: string) => void;
 }
@@ -24,6 +25,7 @@ export function usePlaybackEngine({
   events,
   loopRange,
   isLooping,
+  isLocked,
   onSendCommand,
   onEventStatusUpdate,
   onClearEventStatus
@@ -51,6 +53,7 @@ export function usePlaybackEngine({
     `${prefix}${Math.random().toString(36).substr(2, 9)}`;
 
   const handleSeek = (time: number) => {
+    if (isLocked) return;
     const target = Math.max(0, time);
     setCurrentTime(target);
     lastFiredTime.current = target;
@@ -58,6 +61,7 @@ export function usePlaybackEngine({
   };
 
   const handleStop = () => {
+    if (isLocked) return;
     setIsPlaying(false);
     handleSeek(0);
   };

@@ -15,18 +15,26 @@ export function useRemoteControl({
   onPause,
   onStop
 }: UseRemoteControlProps) {
+  const onPlayRef = useRef(onPlay);
+  const onPauseRef = useRef(onPause);
+  const onStopRef = useRef(onStop);
+
+  useEffect(() => { onPlayRef.current = onPlay; }, [onPlay]);
+  useEffect(() => { onPauseRef.current = onPause; }, [onPause]);
+  useEffect(() => { onStopRef.current = onStop; }, [onStop]);
+
   useEffect(() => {
     const eventSource = new EventSource('/api/remote');
     eventSource.onmessage = (event) => {
       const cmd = event.data;
       console.log('[Remote] Received Command:', cmd);
-      if (cmd === 'PLAY') onPlay();
-      else if (cmd === 'PAUSE') onPause();
-      else if (cmd === 'STOP') onStop();
+      if (cmd === 'PLAY') onPlayRef.current();
+      else if (cmd === 'PAUSE') onPauseRef.current();
+      else if (cmd === 'STOP') onStopRef.current();
     };
 
     return () => eventSource.close();
-  }, [onPlay, onPause, onStop]);
+  }, []); // Empty dependency array prevents reconnection on every render
 
   const lastSyncedStatus = useRef<string>('');
   useEffect(() => {
@@ -41,5 +49,5 @@ export function useRemoteControl({
     }).catch(err => {
       if (err.name !== 'AbortError') console.error('[Remote] Status sync error:', err);
     });
-  }, [isPlaying, currentTime]);
+  }, [isPlaying, currentTime === 0]); // Optimize evaluation frequency
 }

@@ -55,7 +55,7 @@ export default function Home() {
   const [isEditingTime, setIsEditingTime] = useState(false);
   const [editingTime, setEditingTime] = useState('');
 
-  // --- Commmands ---
+  // --- Commands ---
   const sendCommand = useCallback(async (device: DeviceConfig, ev: any, customData?: string) => {
     setEventStatus(prev => ({ ...prev, [ev.id]: { status: 'firing' } }));
     const data = customData !== undefined ? customData : (ev.command || '');
@@ -120,6 +120,7 @@ export default function Home() {
     events,
     loopRange,
     isLooping,
+    isLocked,
     onSendCommand: sendCommand,
     onEventStatusUpdate,
     onClearEventStatus
