@@ -63,3 +63,19 @@ export interface Sequence {
   tracks: TrackConfig[];
   events: Event[];
 }
+
+export interface ActiveRamp {
+  id: string;
+  eventId: string;
+  realStartTime: number; 
+  duration: number;
+  startValue: string | number;
+  endValue: string | number;
+  rampMode: 'smooth' | 'stepped';
+  steps: number; 
+  template: string;
+  deviceId: string;
+  format: DataFormat;
+  terminator: Terminator;
+  lastValue?: string | number;
+}

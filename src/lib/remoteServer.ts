@@ -2,42 +2,65 @@ import net from 'net';
 import { remoteStore } from './remoteStore';
 
 let isServerStarted = false;
+const MAX_CONNECTIONS = 5;
+let connectionCount = 0;
 
 export function startRemoteServer() {
   if (isServerStarted) return;
   
   const port = 9001;
   const server = net.createServer((socket) => {
-    console.log('[RemoteServer] Client connected');
+    if (connectionCount >= MAX_CONNECTIONS) {
+      console.warn(`[RemoteServer] Connection rejected: Max connections reached (${MAX_CONNECTIONS})`);
+      socket.write('ERROR: MAX CONNECTIONS REACHED\r\n');
+      socket.destroy();
+      return;
+    }
+
+    connectionCount++;
+    console.log(`[RemoteServer] Client connected (${connectionCount}/${MAX_CONNECTIONS})`);
+
+    let buffer = '';
 
     socket.on('data', (data) => {
-      const hex = data.toString('hex');
-      const input = data.toString().trim();
-      console.log(`[RemoteServer] Incoming data: "${input}" (Hex: ${hex})`);
+      buffer += data.toString();
+      
+      // TCP Stream Handling: Split by newline or other delimiters if necessary
+      // Here we assume commands might be separated by \n or just arrive in the same packet
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() ?? ''; // Keep the last partial line in buffer
 
-      if (input.includes('@play')) {
-        remoteStore.pushCommand('PLAY');
-        socket.write('@play@\r\n');
-      } else if (input.includes('@pause')) {
-        remoteStore.pushCommand('PAUSE');
-        socket.write('@pause@\r\n');
-      } else if (input.includes('@stop')) {
-        remoteStore.pushCommand('STOP');
-        socket.write('@stop@\r\n');
-      } else if (input.includes('@status')) {
-        const status = remoteStore.getStatus();
-        console.log(`[RemoteServer] Sending status: ${status}`);
-        socket.write(`${status}\r\n`);
-      } else {
-        socket.write('ERROR: UNKNOWN COMMAND (DAW REMOTE CONTROL READY)\r\n');
+      for (const line of lines) {
+        const input = line.trim();
+        if (!input) continue;
+
+        console.log(`[RemoteServer] Processing command: "${input}"`);
+
+        if (input.includes('@play')) {
+          remoteStore.pushCommand('PLAY');
+          socket.write('@play@\r\n');
+        } else if (input.includes('@pause')) {
+          remoteStore.pushCommand('PAUSE');
+          socket.write('@pause@\r\n');
+        } else if (input.includes('@stop')) {
+          remoteStore.pushCommand('STOP');
+          socket.write('@stop@\r\n');
+        } else if (input.includes('@status')) {
+          const status = remoteStore.getStatus();
+          socket.write(`${status}\r\n`);
+        } else {
+          socket.write('ERROR: UNKNOWN COMMAND\r\n');
+        }
       }
     });
 
-    socket.on('end', () => {
-      console.log('[RemoteServer] Client disconnected');
+    socket.on('close', () => {
+      connectionCount--;
+      console.log(`[RemoteServer] Client disconnected (${connectionCount}/${MAX_CONNECTIONS})`);
     });
 
     socket.on('error', (err) => {
+      // connectionCount decrement is handled by 'close'
       console.error('[RemoteServer] Socket error:', err);
     });
   });

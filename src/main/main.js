@@ -40,13 +40,11 @@ function createWindow() {
   });
 }
 
-function startNextServer() {
+function startNextServer(onReady) {
   if (!isDev) {
-    // サーバーの場所を自動判定（ステージング方式と標準方式の両方に対応）
+    const fs = require('fs');
     const rootServerPath = path.join(process.resourcesPath, 'app/server.js');
     const standaloneServerPath = path.join(process.resourcesPath, 'app/.next/standalone/server.js');
-    
-    const fs = require('fs');
     const serverPath = fs.existsSync(rootServerPath) ? rootServerPath : standaloneServerPath;
     const serverCwd = path.dirname(serverPath);
 
@@ -60,14 +58,27 @@ function startNextServer() {
       cwd: serverCwd
     });
 
-    serverProcess.stdout.on('data', (data) => console.log(`[Server] ${data}`));
+    serverProcess.stdout.on('data', (data) => {
+      const output = data.toString();
+      console.log(`[Server] ${output}`);
+      // Next.js standard ready messages
+      if (output.includes('Ready') || output.includes('started server') || output.includes('localhost:3001')) {
+        onReady();
+      }
+    });
     serverProcess.stderr.on('data', (data) => console.error(`[Server Error] ${data}`));
+
+    // Insurance: if no ready signal after 10s, try opening anyway
+    setTimeout(onReady, 10000);
+  } else {
+    onReady();
   }
 }
 
 app.whenReady().then(() => {
-  startNextServer();
-  createWindow();
+  startNextServer(() => {
+    if (!mainWindow) createWindow();
+  });
 });
 
 app.on('window-all-closed', () => {

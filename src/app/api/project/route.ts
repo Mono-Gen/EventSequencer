@@ -5,6 +5,11 @@ import path from 'path';
 // Get absolute path more reliably
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 
+function validateProjectName(name: string): boolean {
+  // 英数字・ハイフン・アンダースコア・スペースのみ許可 (1-64文字)
+  return /^[\w\- ]{1,64}$/.test(name);
+}
+
 async function ensureDir() {
   try {
     await fs.access(DATA_DIR);
@@ -22,7 +27,16 @@ export async function GET(req: Request) {
     const name = searchParams.get('name');
 
     if (name) {
+      if (!validateProjectName(name)) {
+        return NextResponse.json({ success: false, error: 'Invalid project name' }, { status: 400 });
+      }
       const filePath = path.join(DATA_DIR, `${name}.json`);
+      
+      // path.resolve で DATA_DIR 外への脱出を二重チェック
+      if (!path.resolve(filePath).startsWith(path.resolve(DATA_DIR))) {
+        return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
+      }
+
       console.log(`[API] Loading project: ${filePath}`);
       const data = await fs.readFile(filePath, 'utf-8');
       return NextResponse.json({ success: true, data: JSON.parse(data) });
@@ -45,8 +59,18 @@ export async function POST(req: Request) {
     await ensureDir();
     const { name, data } = await req.json();
     if (!name) return NextResponse.json({ success: false, error: 'Project name is required' }, { status: 400 });
+    
+    if (!validateProjectName(name)) {
+      return NextResponse.json({ success: false, error: 'Invalid project name' }, { status: 400 });
+    }
 
     const filePath = path.join(DATA_DIR, `${name}.json`);
+    
+    // path.resolve で DATA_DIR 外への脱出を二重チェック
+    if (!path.resolve(filePath).startsWith(path.resolve(DATA_DIR))) {
+      return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
+    }
+
     console.log(`[API] Saving project to: ${filePath}`);
     await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
     console.log(`[API] Successfully saved: ${name}`);
@@ -63,7 +87,17 @@ export async function DELETE(req: Request) {
     const name = searchParams.get('name');
     if (!name) return NextResponse.json({ success: false, error: 'Project name is required' }, { status: 400 });
 
+    if (!validateProjectName(name)) {
+      return NextResponse.json({ success: false, error: 'Invalid project name' }, { status: 400 });
+    }
+
     const filePath = path.join(DATA_DIR, `${name}.json`);
+    
+    // path.resolve で DATA_DIR 外への脱出を二重チェック
+    if (!path.resolve(filePath).startsWith(path.resolve(DATA_DIR))) {
+      return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
+    }
+
     console.log(`[API] Deleting project: ${filePath}`);
     await fs.unlink(filePath);
     return NextResponse.json({ success: true });

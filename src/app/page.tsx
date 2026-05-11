@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Timeline } from '@/components/Timeline';
 import { Inspector } from '@/components/Inspector';
 import { DeviceInspector } from '@/components/DeviceInspector';
@@ -13,204 +13,50 @@ import {
   Pause, SkipBack, Repeat, X, Lock, Unlock
 } from 'lucide-react';
 
+// --- Hooks ---
+import { usePlaybackEngine } from '@/hooks/usePlaybackEngine';
+import { useProjectPersistence } from '@/hooks/useProjectPersistence';
+import { useDeviceMonitor } from '@/hooks/useDeviceMonitor';
+import { useNtpSync } from '@/hooks/useNtpSync';
+import { useRemoteControl } from '@/hooks/useRemoteControl';
+
 // --- Constants & Helpers ---
-const DEFAULT_ZOOM = 100; // 100% = 100px/sec
+const DEFAULT_ZOOM = 100;
 const MAX_ZOOM = 5000;
-const MIN_ZOOM = 0.01; // Can view 24h in ~900px
-const ENGINE_TICK_MS = 10;
-const NTP_INITIAL_SYNC_INTERVAL = 10000;
-const NTP_MAX_SYNC_INTERVAL = 300000; // 5 minutes
-const NTP_SYNC_INTERVAL_MS = 10000;
-const PING_INTERVAL_MS = 1000;
-const STORAGE_KEY_LAST_PROJECT = 'sequencer_last_project';
+const MIN_ZOOM = 0.01;
 
 import { msToTimeStr, timeStrToMs } from '@/lib/timeUtils';
 
 const generateId = (prefix: string = '') => 
   `${prefix}${Math.random().toString(36).substr(2, 9)}`;
 
-interface ActiveRamp {
-  id: string;
-  eventId: string;
-  realStartTime: number; 
-  duration: number;
-  startValue: string | number;
-  endValue: string | number;
-  rampMode: 'smooth' | 'stepped';
-  steps: number; 
-  template: string;
-  deviceId: string;
-  format: 'ascii' | 'hex';
-  terminator: any;
-  lastValue?: string | number;
-}
-
 export default function Home() {
   // State: Core Data
-  const [projectName, setProjectName] = useState<string>("default");
   const [devices, setDevices] = useState<DeviceConfig[]>([]);
   const [tracks, setTracks] = useState<TrackConfig[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
-
-  // Refs for Engine
-  const devicesRef = useRef(devices);
-  const tracksRef = useRef(tracks);
-  const eventsRef = useRef(events);
-  useEffect(() => { devicesRef.current = devices; }, [devices]);
-  useEffect(() => { tracksRef.current = tracks; }, [tracks]);
-  useEffect(() => { eventsRef.current = events; }, [events]);
+  const [loopRange, setLoopRange] = useState<{ start: number, end: number } | null>(null);
+  const [isLooping, setIsLooping] = useState(false);
 
   // State: UI & Status
-  const [currentTime, setCurrentTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [mode, setMode] = useState<'realtime' | 'relative'>('relative');
   const [zoom, setZoom] = useState(DEFAULT_ZOOM); 
   const [isChasing, setIsChasing] = useState(true);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [collapsedDeviceIds, setCollapsedDeviceIds] = useState<Set<string>>(new Set());
-  const [deviceStatus, setDeviceStatus] = useState<Record<string, 'online' | 'offline' | 'checking'>>({});
   const [showSyncSettings, setShowSyncSettings] = useState(false);
   const [showProjectManager, setShowProjectManager] = useState(false);
   const [eventStatus, setEventStatus] = useState<Record<string, { status: 'firing' | 'success' | 'error', message?: string }>>({});
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error' | 'loading' | 'loaded'>('idle');
   const [isLocked, setIsLocked] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // State: Playback Extensions
-  const [loopRange, setLoopRange] = useState<{ start: number, end: number } | null>(null);
-  const [isLooping, setIsLooping] = useState(false);
-  const loopRangeRef = useRef(loopRange);
-  const isLoopingRef = useRef(isLooping);
-  useEffect(() => { loopRangeRef.current = loopRange; }, [loopRange]);
-  useEffect(() => { isLoopingRef.current = isLooping; }, [isLooping]);
 
   const [timeSource, setTimeSource] = useState<'os' | 'ntp'>('os');
   const [ntpServer, setNtpServer] = useState('pool.ntp.org');
-  const [timeOffset, setTimeOffset] = useState(0); 
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [currentNtpInterval, setCurrentNtpInterval] = useState(NTP_INITIAL_SYNC_INTERVAL);
-  const ntpTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const [activeRamps, setActiveRamps] = useState<ActiveRamp[]>([]);
-  const activeRampsRef = useRef(activeRamps);
-  useEffect(() => { activeRampsRef.current = activeRamps; }, [activeRamps]);
-
-  const lastFiredTime = useRef<number>(0);
-  const selectedEvent = events.find(e => e.id === selectedEventId);
-  const selectedDevice = devices.find(d => d.id === selectedDeviceId);
-
   const [isEditingTime, setIsEditingTime] = useState(false);
   const [editingTime, setEditingTime] = useState('');
 
-  // --- Persistence ---
-  const handleLoadProject = async (name: string, isQuick: boolean = false) => {
-    setSaveStatus('loading');
-    setErrorMessage(null);
-    try {
-      const res = await fetch(`/api/project?name=${encodeURIComponent(name)}`);
-      const result = await res.json();
-      if (result.success && result.data) {
-        setProjectName(name);
-        localStorage.setItem(STORAGE_KEY_LAST_PROJECT, name);
-        setDevices(result.data.devices || []);
-        setTracks(result.data.tracks || []);
-        setEvents(result.data.events || []);
-        setLoopRange(result.data.loopRange || null);
-        setIsLooping(result.data.isLooping || false);
-        setSaveStatus(isQuick ? 'loaded' : 'idle');
-        if (isQuick) setTimeout(() => setSaveStatus('idle'), 2000);
-        setShowProjectManager(false);
-      } else { setSaveStatus('idle'); }
-    } catch (err) { 
-      setSaveStatus('error');
-      setErrorMessage(`Failed to load project: ${name}`);
-    }
-  };
-
-  const handleSaveProject = async (name: string) => {
-    setSaveStatus('saving');
-    setErrorMessage(null);
-    try {
-      const res = await fetch('/api/project', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, data: { devices, tracks, events, loopRange, isLooping } }),
-      });
-      const result = await res.json();
-      if (result.success) {
-        setProjectName(name);
-        localStorage.setItem(STORAGE_KEY_LAST_PROJECT, name);
-        setSaveStatus('saved');
-        setTimeout(() => setSaveStatus('idle'), 3000);
-      } else { 
-        setSaveStatus('error'); 
-        setErrorMessage(result.error || 'Unknown save error');
-      }
-    } catch (err) { setSaveStatus('error'); setErrorMessage('Network error during save'); }
-  };
-
-  useEffect(() => {
-    const lastProject = localStorage.getItem(STORAGE_KEY_LAST_PROJECT) || 'default';
-    handleLoadProject(lastProject);
-
-    // --- Remote Control Listener (SSE) ---
-    const eventSource = new EventSource('/api/remote');
-    eventSource.onmessage = (event) => {
-      const cmd = event.data;
-      console.log('[Remote] Received Command:', cmd);
-      if (cmd === 'PLAY') setIsPlaying(true);
-      else if (cmd === 'PAUSE') setIsPlaying(false);
-      else if (cmd === 'STOP') { setIsPlaying(false); handleSeek(0); }
-    };
-
-    return () => eventSource.close();
-  }, []);
-
-  // Sync Transport Status to Remote Server (Only on state change)
-  const lastSyncedStatus = useRef<string>('');
-  useEffect(() => {
-    const status = isPlaying ? 'play' : (currentTime > 0 ? 'pause' : 'stop');
-    if (status === lastSyncedStatus.current) return;
-
-    lastSyncedStatus.current = status;
-    fetch('/api/remote/status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status })
-    }).catch(err => {
-      // Ignore abort errors during reload/restart
-      if (err.name !== 'AbortError') console.error('[Remote] Status sync error:', err);
-    });
-  }, [isPlaying, currentTime === 0]);
-
-  const checkDevices = async () => {
-    const currentDevices = devicesRef.current;
-    if (currentDevices.length === 0) return;
-    try {
-      const res = await fetch('/api/command', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ devices: currentDevices, isPing: true })
-      });
-      const result = await res.json();
-      if (result.success && result.results) {
-        const newStatus: Record<string, 'online' | 'offline'> = {};
-        Object.entries(result.results).forEach(([id, isOnline]) => {
-          newStatus[id] = isOnline ? 'online' : 'offline';
-        });
-        setDeviceStatus(newStatus);
-      }
-    } catch (err) {}
-  };
-
-  useEffect(() => {
-    const interval = setInterval(checkDevices, PING_INTERVAL_MS);
-    checkDevices();
-    return () => clearInterval(interval);
-  }, []);
-
-  const sendCommand = async (device: DeviceConfig, ev: any, customData?: string) => {
+  // --- Commmands ---
+  const sendCommand = useCallback(async (device: DeviceConfig, ev: any, customData?: string) => {
     setEventStatus(prev => ({ ...prev, [ev.id]: { status: 'firing' } }));
     const data = customData !== undefined ? customData : (ev.command || '');
     try {
@@ -223,54 +69,81 @@ export default function Home() {
         }
       } else { setEventStatus(prev => ({ ...prev, [ev.id]: { status: 'error', message: result.error } })); }
     } catch (err) { setEventStatus(prev => ({ ...prev, [ev.id]: { status: 'error', message: 'Network Error' } })); }
-  };
+  }, []);
 
-  const handleUpdateDevice = (id: string, updates: Partial<DeviceConfig>) => {
-    setDevices(prev => prev.map(d => d.id === id ? { ...d, ...updates } : d));
-  };
+  const onClearEventStatus = useCallback((eventId: string) => {
+    setEventStatus(prev => { const newState = { ...prev }; delete newState[eventId]; return newState; });
+  }, []);
 
-  const handleUpdateTrack = (id: string, updates: Partial<TrackConfig>) => {
-    setTracks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-  };
+  const onEventStatusUpdate = useCallback((eventId: string, status: 'firing' | 'success' | 'error', message?: string) => {
+    setEventStatus(prev => ({ ...prev, [eventId]: { status, message } }));
+  }, []);
 
-  const syncNtp = async () => {
-    if (timeSource !== 'ntp') return;
-    setIsSyncing(true);
-    try {
-      const res = await fetch(`/api/ntp?server=${encodeURIComponent(ntpServer)}`);
-      const data = await res.json();
-      if (data.success) {
-        const end = Date.now();
-        setTimeOffset((data.time + (end - data.time)/2) - end);
-        
-        // Success: Increase interval up to max
-        setCurrentNtpInterval(prev => Math.min(NTP_MAX_SYNC_INTERVAL, prev * 2));
-      } else {
-        // Fail: Reset to initial frequent sync
-        setCurrentNtpInterval(NTP_INITIAL_SYNC_INTERVAL);
-      }
-    } catch (err) {
-      setCurrentNtpInterval(NTP_INITIAL_SYNC_INTERVAL);
-    } finally {
-      setIsSyncing(false);
-      // Schedule next sync
-      if (ntpTimerRef.current) clearTimeout(ntpTimerRef.current);
-      ntpTimerRef.current = setTimeout(syncNtp, currentNtpInterval);
+  // --- Hook: Project Persistence ---
+  const {
+    projectName,
+    saveStatus,
+    errorMessage,
+    handleLoadProject,
+    handleSaveProject
+  } = useProjectPersistence({
+    onDataLoaded: (data) => {
+      setDevices(data.devices || []);
+      setTracks(data.tracks || []);
+      setEvents(data.events || []);
+      setLoopRange(data.loopRange || null);
+      setIsLooping(data.isLooping || false);
     }
-  };
+  });
 
+  // --- Hook: NTP Sync ---
+  const { timeOffset, isSyncing, syncNtp } = useNtpSync({
+    enabled: timeSource === 'ntp' && mode === 'realtime',
+    ntpServer
+  });
+
+  // --- Hook: Playback Engine ---
+  const {
+    currentTime,
+    setCurrentTime,
+    isPlaying,
+    setIsPlaying,
+    handleSeek,
+    handleStop,
+    activeRamps,
+    setActiveRamps
+  } = usePlaybackEngine({
+    mode,
+    timeOffset,
+    devices,
+    tracks,
+    events,
+    loopRange,
+    isLooping,
+    onSendCommand: sendCommand,
+    onEventStatusUpdate,
+    onClearEventStatus
+  });
+
+  // --- Hook: Device Monitoring ---
+  const { deviceStatus } = useDeviceMonitor(devices);
+
+  // --- Hook: Remote Control ---
+  useRemoteControl({
+    isPlaying,
+    currentTime,
+    onPlay: () => setIsPlaying(true),
+    onPause: () => setIsPlaying(false),
+    onStop: handleStop
+  });
+
+  // Initialize
   useEffect(() => {
-    if (timeSource === 'ntp' && mode === 'realtime') {
-      syncNtp();
-      return () => {
-        if (ntpTimerRef.current) clearTimeout(ntpTimerRef.current);
-      };
-    } else { 
-      setTimeOffset(0); 
-      if (ntpTimerRef.current) clearTimeout(ntpTimerRef.current);
-    }
-  }, [timeSource, ntpServer, mode]);
+    const lastProject = localStorage.getItem('sequencer_last_project') || 'default';
+    handleLoadProject(lastProject);
+  }, []);
 
+  // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -279,128 +152,12 @@ export default function Home() {
         setEvents(prev => prev.filter(ev => ev.id !== selectedEventId));
         setSelectedEventId(null);
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); handleSaveProject(projectName); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); handleSaveProject(projectName, { devices, tracks, events, loopRange, isLooping }); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'o') { e.preventDefault(); setShowProjectManager(true); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedEventId, devices, tracks, events, projectName]);
-
-  useEffect(() => {
-    const runEngine = () => {
-      const wallNow = Date.now();
-      let engineNowMs = 0;
-      if (mode === 'realtime') {
-        engineNowMs = wallNow + timeOffset;
-        const syncedDate = new Date(engineNowMs);
-        engineNowMs = ((syncedDate.getHours() * 3600) + (syncedDate.getMinutes() * 60) + syncedDate.getSeconds()) * 1000 + syncedDate.getMilliseconds();
-      } else {
-        if (isPlaying) { 
-          engineNowMs = lastFiredTime.current + ENGINE_TICK_MS;
-          if (isLoopingRef.current && loopRangeRef.current) {
-            if (engineNowMs >= loopRangeRef.current.end) {
-              engineNowMs = loopRangeRef.current.start;
-              lastFiredTime.current = engineNowMs - ENGINE_TICK_MS;
-            }
-          }
-        } 
-        else { engineNowMs = lastFiredTime.current; }
-      }
-      
-      if (isPlaying || mode === 'realtime') {
-        setCurrentTime(engineNowMs);
-        
-        const isWrapAround = engineNowMs < lastFiredTime.current;
-        const maxTime = (mode === 'realtime') ? 86400000 : (isLoopingRef.current && loopRangeRef.current ? loopRangeRef.current.end : 86400000);
-        const startTime = (mode === 'realtime') ? 0 : (isLoopingRef.current && loopRangeRef.current ? loopRangeRef.current.start : 0);
-
-        eventsRef.current.forEach(ev => {
-          let shouldFire = false;
-          if (isWrapAround) {
-            // Check end of previous period AND start of new one
-            shouldFire = (ev.time >= lastFiredTime.current && ev.time < maxTime) || (ev.time >= startTime && ev.time < engineNowMs);
-          } else {
-            shouldFire = ev.time >= lastFiredTime.current && ev.time < engineNowMs;
-          }
-
-          if (shouldFire) {
-            const track = tracksRef.current.find(t => t.id === ev.trackId);
-            const device = devicesRef.current.find(d => d.id === track?.deviceId);
-            if (device) {
-              if (ev.type === 'ramp') {
-                const re = ev as RampEvent;
-                const startVal = parseFloat(re.startValue.toString()) || 0;
-                const isOsc = device.protocol === 'osc';
-                const isFloat = (re.commandTemplate || '').includes('f:');
-                const startValueStr = re.startValue.toString();
-                const initialCommand = (re.commandTemplate || 'VOL {value}').replace('{value}', startValueStr).replace('{valeu}', startValueStr);
-                sendCommand(device, { id: ev.id, type: 'trigger', format: ev.format, terminator: ev.terminator }, initialCommand);
-
-                setActiveRamps(prev => [...prev, {
-                  id: generateId('active_ramp_'), eventId: ev.id, realStartTime: wallNow, duration: re.duration, startValue: re.startValue, endValue: re.endValue,
-                  rampMode: re.rampMode || 'smooth', steps: re.steps || 10, template: re.commandTemplate, deviceId: device.id, format: ev.format, terminator: ev.terminator, 
-                  lastValue: startValueStr
-                }]);
-              } else { sendCommand(device, ev); }
-            }
-          }
-        });
-        lastFiredTime.current = engineNowMs;
-      }
-
-      if (activeRampsRef.current.length > 0) {
-        setActiveRamps(prev => {
-          const nextRamps: ActiveRamp[] = [];
-          prev.forEach(ramp => {
-            const duration = Number(ramp.duration) || 1000;
-            const startVal = Number(ramp.startValue) || 0;
-            const endVal = Number(ramp.endValue) || 0;
-            const elapsed = wallNow - ramp.realStartTime;
-            const progress = Math.min(1, elapsed / duration);
-            const device = devicesRef.current.find(d => d.id === ramp.deviceId);
-            const isOsc = device?.protocol === 'osc';
-            const isFloat = (ramp.template || '').includes('f:');
-
-            let val: number;
-            if (ramp.rampMode === 'stepped') {
-              const steps = Math.max(1, ramp.steps);
-              const stepProgress = Math.floor(progress * steps) / steps;
-              val = startVal + (endVal - startVal) * stepProgress;
-              if (progress >= 1) val = endVal;
-            } else { 
-              val = startVal + (endVal - startVal) * progress;
-            }
-
-            const finalVal = (isOsc || isFloat) ? val : Math.round(val);
-            const lastValNum = ramp.lastValue !== undefined ? Number(ramp.lastValue) : -999999;
-            const hasChanged = Math.abs(finalVal - lastValNum) > 0.0001;
-
-            if (progress < 1) {
-              if (hasChanged) {
-                const command = (ramp.template || 'VOL {value}').replace('{value}', finalVal.toString()).replace('{valeu}', finalVal.toString());
-                if (device) sendCommand(device, { id: ramp.eventId, type: 'trigger', format: ramp.format, terminator: ramp.terminator }, command);
-                ramp.lastValue = finalVal;
-              }
-              nextRamps.push(ramp);
-            } else {
-              // Final value - use the original string to avoid float precision issues (like 0.899999...)
-              const endValueStr = ramp.endValue.toString();
-              if (ramp.lastValue?.toString() !== endValueStr) {
-                const command = (ramp.template || 'VOL {value}').replace('{value}', endValueStr).replace('{valeu}', endValueStr);
-                if (device) sendCommand(device, { id: ramp.eventId, type: 'trigger', format: ramp.format, terminator: ramp.terminator }, command);
-                ramp.lastValue = endValueStr;
-              }
-              setTimeout(() => setEventStatus(os => { const n = {...os}; delete n[ramp.eventId]; return n; }), 1000);
-            }
-          });
-          activeRampsRef.current = nextRamps;
-          return nextRamps;
-        });
-      }
-    };
-    const interval = setInterval(runEngine, ENGINE_TICK_MS);
-    return () => clearInterval(interval);
-  }, [isPlaying, mode, timeOffset]);
+  }, [selectedEventId, devices, tracks, events, projectName, isPlaying, loopRange, isLooping]);
 
   // Handlers
   const handleSelectEvent = (id: string | null) => { setSelectedEventId(id); if (id) setSelectedDeviceId(null); };
@@ -459,8 +216,8 @@ export default function Home() {
     });
   };
 
-  const handleSeek = (time: number) => { if (isLocked) return; const target = Math.max(0, time); setCurrentTime(target); lastFiredTime.current = target; setActiveRamps([]); };
-  const handleStop = () => { if (isLocked) return; setIsPlaying(false); handleSeek(0); };
+  const selectedEvent = events.find(e => e.id === selectedEventId);
+  const selectedDevice = devices.find(d => d.id === selectedDeviceId);
 
   return (
     <div className="flex h-screen bg-[#050505] text-zinc-100 overflow-hidden font-sans">
@@ -482,7 +239,7 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-2">
               <button 
-                onClick={() => handleSaveProject(projectName)} 
+                onClick={() => handleSaveProject(projectName, { devices, tracks, events, loopRange, isLooping })} 
                 disabled={isLocked}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-black transition-all border ${isLocked ? 'opacity-30 cursor-not-allowed bg-zinc-900 text-zinc-600 border-zinc-800' : saveStatus === 'saved' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:bg-zinc-800 hover:text-white'}`}
               >
@@ -517,7 +274,7 @@ export default function Home() {
               <button onClick={() => { setMode('relative'); setShowSyncSettings(false); }} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[11px] font-black transition-all ${mode === 'relative' ? 'bg-zinc-800 text-white shadow-xl' : 'text-zinc-500 hover:text-zinc-300'}`}><Clock size={14} /> RELATIVE</button>
               <button onClick={() => setMode('realtime')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[11px] font-black transition-all ${mode === 'realtime' ? 'bg-zinc-800 text-white shadow-xl' : 'text-zinc-500 hover:text-zinc-300'}`}><Globe size={14} /> REAL-TIME</button>
             </div>
-
+ 
             <div 
               className={`flex flex-col items-end gap-0.5 bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-1.5 transition-all shadow-inner ${mode === 'realtime' ? 'border-emerald-500/30 text-emerald-400' : 'text-blue-400'} ${!isLocked && mode === 'relative' ? 'cursor-text hover:border-blue-500/40' : ''}`}
               onClick={() => { if (!isLocked && mode === 'relative') { setIsEditingTime(true); setEditingTime(msToTimeStr(currentTime)); } }}
@@ -556,7 +313,7 @@ export default function Home() {
                 </div>
               )}
             </div>
-
+ 
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => setIsLocked(!isLocked)} 
@@ -566,7 +323,7 @@ export default function Home() {
                 {isLocked ? <Lock size={18} /> : <Unlock size={18} />}
                 {isLocked && <span className="text-[10px] font-black tracking-widest mr-1">LOCKED</span>}
               </button>
-
+ 
               <button onClick={() => setIsChasing(!isChasing)} className={`p-2 rounded-xl border transition-all ${isChasing ? 'bg-blue-500/10 text-blue-500 border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'bg-zinc-900 text-zinc-500 border-zinc-800'}`} title="Auto-Chase"><Target size={18} className={isChasing ? 'animate-pulse' : ''} /></button>
               
               {mode === 'relative' && (
@@ -608,7 +365,7 @@ export default function Home() {
             </div>
           </div>
         </header>
-
+ 
         <main className="flex-1 overflow-hidden flex flex-col p-6 gap-6">
           <Timeline 
             tracks={tracks} devices={devices} events={events} onAddEvent={handleAddEvent} 
@@ -622,8 +379,8 @@ export default function Home() {
             collapsedDeviceIds={collapsedDeviceIds} onToggleDeviceCollapse={handleToggleDeviceCollapse} 
             deviceStatus={deviceStatus}
             loopRange={loopRange} onLoopRangeChange={setLoopRange}
-            onUpdateDevice={handleUpdateDevice}
-            onUpdateTrack={handleUpdateTrack}
+            onUpdateDevice={(id, updates) => setDevices(prev => prev.map(d => d.id === id ? { ...d, ...updates } : d))}
+            onUpdateTrack={(id, updates) => setTracks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))}
             isLocked={isLocked}
           />
         </main>
@@ -644,7 +401,7 @@ export default function Home() {
                 <button onClick={() => setTimeSource('ntp')} className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${timeSource === 'ntp' ? 'bg-blue-600 text-white shadow-lg' : 'text-zinc-600 hover:text-zinc-400'}`}>NTP Clock</button>
               </div>
             </div>
-
+ 
             {timeSource === 'ntp' && (
               <div className="space-y-4 animate-in slide-in-from-top-2">
                 <div className="space-y-2">
@@ -668,7 +425,7 @@ export default function Home() {
                     <div className="h-full bg-blue-500 animate-pulse" style={{ width: `${Math.min(100, Math.abs(timeOffset/10))}%` }} />
                   </div>
                 </div>
-
+ 
                 <button 
                   onClick={syncNtp} 
                   disabled={isSyncing}
@@ -686,8 +443,8 @@ export default function Home() {
           </div>
         </div>
       )}
-
-      {showProjectManager && <ProjectManager currentProjectName={projectName} onLoad={handleLoadProject} onSave={handleSaveProject} onClose={() => setShowProjectManager(false)} />}
+ 
+      {showProjectManager && <ProjectManager currentProjectName={projectName} onLoad={handleLoadProject} onSave={(name) => handleSaveProject(name, { devices, tracks, events, loopRange, isLooping })} onClose={() => setShowProjectManager(false)} />}
       {selectedEvent && (
         <div className="w-80 flex-shrink-0 z-[100] relative">
           <Inspector 
@@ -698,27 +455,20 @@ export default function Home() {
             onDelete={(id) => { setEvents(events.filter(e => e.id !== id)); setSelectedEventId(null); }} 
             onClose={() => setSelectedEventId(null)}
             onFire={(ev) => {
-              const track = tracksRef.current.find(t => t.id === ev.trackId);
-              const device = devicesRef.current.find(d => d.id === track?.deviceId);
+              const track = tracks.find(t => t.id === ev.trackId);
+              const device = devices.find(d => d.id === track?.deviceId);
               if (device) {
                 if (ev.type === 'ramp') {
                   const re = ev as RampEvent;
-                  const startVal = parseFloat(re.startValue.toString()) || 0;
-                  const isOsc = device.protocol === 'osc';
-                  const isFloat = (re.commandTemplate || '').includes('f:');
                   const startValueStr = re.startValue.toString();
-                  const initialCommand = (re.commandTemplate || 'VOL {value}').replace('{value}', startValueStr).replace('{valeu}', startValueStr);
+                  const initialCommand = (re.commandTemplate || 'VOL {value}').replace('{value}', startValueStr);
                   sendCommand(device, { id: ev.id, type: 'trigger', format: ev.format, terminator: ev.terminator }, initialCommand);
-
-                  setActiveRamps(prev => {
-                    const next = [...prev, {
-                      id: generateId('preview_ramp_'), eventId: ev.id, realStartTime: Date.now(), duration: re.duration, startValue: re.startValue, endValue: re.endValue,
-                      rampMode: re.rampMode || 'smooth', steps: re.steps || 10, template: re.commandTemplate, deviceId: device.id, format: ev.format, terminator: ev.terminator, 
-                      lastValue: startValueStr
-                    }];
-                    activeRampsRef.current = next;
-                    return next;
-                  });
+ 
+                  setActiveRamps(prev => [...prev, {
+                    id: generateId('preview_ramp_'), eventId: ev.id, realStartTime: Date.now(), duration: re.duration, startValue: re.startValue, endValue: re.endValue,
+                    rampMode: re.rampMode || 'smooth', steps: re.steps || 10, template: re.commandTemplate, deviceId: device.id, format: ev.format, terminator: ev.terminator, 
+                    lastValue: startValueStr
+                  }]);
                 } else { sendCommand(device, ev); }
               }
             }}
