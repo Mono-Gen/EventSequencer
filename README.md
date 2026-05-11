@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./docs/assets/logo.png" width="400" alt="EventSequencer v0.9.2 Logo" />
+  <img src="./docs/assets/logo.png" width="400" alt="EventSequencer v0.9.3 Logo" />
 </p>
 
-A professional-grade standalone DAW sequencer built with Next.js and Electron (v0.9.2). Designed for mission-critical event triggering and remote hardware automation with high-precision timing.
+A professional-grade standalone DAW sequencer built with Next.js and Electron (v0.9.3). Designed for mission-critical event triggering and remote hardware automation with high-precision timing.
 
 ![UI Screenshot](./docs/assets/ui_screenshot.png)
 

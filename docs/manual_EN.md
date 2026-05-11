@@ -1,4 +1,4 @@
-# EventSequencer Operation Manual (v0.9.2)
+# EventSequencer Operation Manual (v0.9.3)
 
 EventSequencer is a professional-grade standalone DAW sequencer built with Next.js and Electron.
 

@@ -1,4 +1,4 @@
-# EventSequencer 操作マニュアル (v0.9.2)
+# EventSequencer 操作マニュアル (v0.9.3)
 
 EventSequencer は、Next.js と Electron をベースにしたプロフェッショナル向けのスタンドアロン DAW シーケンサーです。
 
